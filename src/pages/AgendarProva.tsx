@@ -1,7 +1,6 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -13,6 +12,7 @@ import {
 } from "@/components/ui/select";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -28,50 +28,12 @@ const AgendarProva = () => {
   const { user } = useAuth();
   
   const [formData, setFormData] = useState({
-    studentId: "",
+    nomeAluno: "",
     examDate: new Date(),
     computerNumber: "",
     shift: "",
     classTime: "",
     examType: "P1" as "P1" | "Rec.1" | "Rec.2",
-  });
-
-  // Buscar lista de alunos
-  const { data: students, isLoading: loadingStudents } = useQuery({
-    queryKey: ['students'],
-    queryFn: async () => {
-      if (!supabase) throw new Error("Cliente Supabase não inicializado");
-
-      const { data, error } = await supabase
-        .from('users')
-        .select('*')
-        .eq('role', 'student');
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  // Buscar agendamentos recentes
-  const { data: recentExams, isLoading: loadingExams } = useQuery({
-    queryKey: ['recent-exams'],
-    queryFn: async () => {
-      if (!supabase) throw new Error("Cliente Supabase não inicializado");
-
-      const { data, error } = await supabase
-        .from('exams')
-        .select(`
-          *,
-          users:student_id (
-            name
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5);
-
-      if (error) throw error;
-      return data;
-    },
   });
 
   // Mutation para criar novo agendamento
@@ -83,7 +45,7 @@ const AgendarProva = () => {
       const { error } = await supabase
         .from('exams')
         .insert({
-          student_id: examData.studentId,
+          student_name: examData.nomeAluno,
           exam_date: examData.examDate.toISOString(),
           computer_number: parseInt(examData.computerNumber),
           shift: examData.shift,
@@ -102,7 +64,7 @@ const AgendarProva = () => {
         description: "A prova foi agendada com sucesso!",
       });
       setFormData({
-        studentId: "",
+        nomeAluno: "",
         examDate: new Date(),
         computerNumber: "",
         shift: "",
@@ -126,7 +88,6 @@ const AgendarProva = () => {
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6 animate-fade-in">
-      {/* Title Section */}
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-primary mb-2">
           Agendamento de Provas
@@ -136,31 +97,20 @@ const AgendarProva = () => {
         </p>
       </div>
 
-      {/* Form Section */}
       <form onSubmit={handleSubmit} className="space-y-6 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Student Selection */}
+          {/* Nome do Aluno */}
           <div className="space-y-2">
-            <Label htmlFor="studentId">Aluno</Label>
-            <Select
-              value={formData.studentId}
-              onValueChange={(value) => 
-                setFormData(prev => ({ ...prev, studentId: value }))
+            <Label htmlFor="nomeAluno">Nome do Aluno</Label>
+            <Input
+              id="nomeAluno"
+              value={formData.nomeAluno}
+              onChange={(e) => 
+                setFormData(prev => ({ ...prev, nomeAluno: e.target.value }))
               }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Selecione o aluno" />
-              </SelectTrigger>
-              <SelectContent>
-                {loadingStudents ? (
-                  <SelectItem value="loading">Carregando alunos...</SelectItem>
-                ) : students?.map((student) => (
-                  <SelectItem key={student.id} value={student.id}>
-                    {student.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Digite o nome do aluno"
+              required
+            />
           </div>
 
           {/* Exam Type */}
@@ -197,7 +147,7 @@ const AgendarProva = () => {
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {formData.examDate ? (
-                    format(formData.examDate, "PPP")
+                    format(formData.examDate, "PPP", { locale: ptBR })
                   ) : (
                     <span>Selecione uma data</span>
                   )}
@@ -211,6 +161,7 @@ const AgendarProva = () => {
                     setFormData(prev => ({ ...prev, examDate: date || new Date() }))
                   }
                   initialFocus
+                  locale={ptBR}
                 />
               </PopoverContent>
             </Popover>

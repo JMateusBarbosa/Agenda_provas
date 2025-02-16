@@ -1,11 +1,13 @@
 
 import { useState } from "react";
-import { Menu, X, GraduationCap, LogOut } from "lucide-react";
+import { Menu, X, GraduationCap, LogOut, User } from "lucide-react";
 import { useLocation, Link } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const Navbar = () => {
   const [isOpen, setIsOpen] = useState(false);
   const location = useLocation();
+  const { user } = useAuth();
 
   const getNavItems = () => {
     // Admin dashboard navigation
@@ -70,13 +72,18 @@ const Navbar = () => {
             <span className="text-white text-xl font-bold hidden sm:block">
               Sistema de Agendamento de Provas
             </span>
-            {/* Mobile title */}
             <span className="text-white text-lg font-bold sm:hidden">
               Sistema de Provas
             </span>
           </div>
-          <div className="hidden md:block">
-            <div className="ml-10 flex items-baseline space-x-4">
+          <div className="hidden md:flex md:items-center md:space-x-4">
+            {isAdminDashboard && (
+              <div className="text-white flex items-center mr-4">
+                <User className="h-4 w-4 mr-2" />
+                <span className="text-sm">{user?.email?.split('@')[0]}</span>
+              </div>
+            )}
+            <div className="flex items-baseline space-x-4">
               {navItems.map((item) => (
                 <Link
                   key={item.name}
@@ -117,6 +124,12 @@ const Navbar = () => {
       {isOpen && (
         <div className="md:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 sm:px-3">
+            {isAdminDashboard && (
+              <div className="text-white flex items-center px-3 py-2">
+                <User className="h-4 w-4 mr-2" />
+                <span className="text-sm">{user?.email?.split('@')[0]}</span>
+              </div>
+            )}
             {navItems.map((item) => (
               <Link
                 key={item.name}
