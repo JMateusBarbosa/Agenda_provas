@@ -1,15 +1,18 @@
 
-export type ProvaStatus = "Pendente" | "Aprovado" | "Reprovado";
-export type TipoProva = "P1" | "Rec.1" | "Rec.2";
-export type DiasAula = "Segunda/Quarta" | "Terça/Quinta" | "Sábado" | "Segunda a Quinta";
+export type DiasAula = "Segunda a Quinta" | "Sábado";
 
 export interface ProvaType {
-  id: number;
+  id: string;
   nomeAluno: string;
   modulo: string;
   dataProva: string;
-  status: ProvaStatus;
-  tipoProva: TipoProva;
+  status: 'pending' | 'approved' | 'failed';
+  tipoProva: 'P1' | 'Rec.1' | 'Rec.2';
   diasAula: DiasAula;
-  dataRecuperacao?: string;
+  student_id: string;
+  computer_number: number;
+  shift: 'morning' | 'afternoon';
+  class_time: string;
+  created_by: string;
+  recovery_date?: string;
 }

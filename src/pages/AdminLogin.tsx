@@ -1,39 +1,31 @@
 
 import { useState } from "react";
 import { User, Lock, Eye, EyeOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import Footer from "@/components/Footer";
 import Navbar from "@/components/Navbar";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AdminLogin = () => {
-  const navigate = useNavigate();
+  const { signIn } = useAuth();
   const { toast } = useToast();
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError(false);
+    setIsLoading(true);
 
-    // Mock login validation
-    if (email === "admin@gmail.com" && password === "admin") {
-      toast({
-        title: "Login realizado com sucesso!",
-        description: "Você será redirecionado para a área administrativa.",
-      });
-      navigate("/admin/dashboard");
-    } else {
-      setError(true);
-      toast({
-        variant: "destructive",
-        title: "Erro no login",
-        description: "E-mail ou senha incorretos. Tente novamente.",
-      });
+    try {
+      await signIn(email, password);
+    } catch (error) {
+      console.error("Erro no login:", error);
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -87,25 +79,14 @@ const AdminLogin = () => {
               </div>
             </div>
 
-            {error && (
-              <p className="text-destructive text-sm text-center">
-                E-mail ou senha incorretos. Tente novamente.
-              </p>
-            )}
-
             <Button
               type="submit"
               className="w-full bg-primary-gold hover:bg-primary hover:text-white text-primary transition-colors"
+              disabled={isLoading}
             >
-              Entrar
+              {isLoading ? "Entrando..." : "Entrar"}
             </Button>
           </form>
-
-          <div className="mt-4 text-center text-sm text-gray-600">
-            <p>Para teste, use:</p>
-            <p>Email: admin@gmail.com</p>
-            <p>Senha: admin</p>
-          </div>
         </div>
       </main>
       <Footer />

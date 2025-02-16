@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -10,47 +11,117 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Calendar } from "lucide-react";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/contexts/AuthContext";
 
 const AgendarProva = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  
   const [formData, setFormData] = useState({
-    studentName: "",
-    moduleName: "",
-    examDate: "",
+    studentId: "",
+    examDate: new Date(),
     computerNumber: "",
     shift: "",
     classTime: "",
+    examType: "P1" as "P1" | "Rec.1" | "Rec.2",
   });
 
-  // Mock data for recent appointments
-  const recentAppointments = [
-    {
-      id: 1,
-      studentName: "João Silva",
-      moduleName: "JavaScript Básico",
-      examDate: "2024-03-20",
-      computerNumber: "5",
-      shift: "Manhã",
-      classTime: "8:30 - 9:30",
-    },
-    // ... add more mock data if needed
-  ];
+  // Buscar lista de alunos
+  const { data: students, isLoading: loadingStudents } = useQuery({
+    queryKey: ['students'],
+    queryFn: async () => {
+      if (!supabase) throw new Error("Cliente Supabase não inicializado");
 
-  const handleInputChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('role', 'student');
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Buscar agendamentos recentes
+  const { data: recentExams, isLoading: loadingExams } = useQuery({
+    queryKey: ['recent-exams'],
+    queryFn: async () => {
+      if (!supabase) throw new Error("Cliente Supabase não inicializado");
+
+      const { data, error } = await supabase
+        .from('exams')
+        .select(`
+          *,
+          users:student_id (
+            name
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Mutation para criar novo agendamento
+  const createExamMutation = useMutation({
+    mutationFn: async (examData: typeof formData) => {
+      if (!supabase) throw new Error("Cliente Supabase não inicializado");
+      if (!user?.id) throw new Error("Usuário não autenticado");
+
+      const { error } = await supabase
+        .from('exams')
+        .insert({
+          student_id: examData.studentId,
+          exam_date: examData.examDate.toISOString(),
+          computer_number: parseInt(examData.computerNumber),
+          shift: examData.shift,
+          class_time: examData.classTime,
+          exam_type: examData.examType,
+          created_by: user.id,
+          status: 'pending'
+        });
+
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['recent-exams'] });
+      toast({
+        title: "Agendamento realizado",
+        description: "A prova foi agendada com sucesso!",
+      });
+      setFormData({
+        studentId: "",
+        examDate: new Date(),
+        computerNumber: "",
+        shift: "",
+        classTime: "",
+        examType: "P1",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Erro ao agendar",
+        description: error instanceof Error ? error.message : "Erro desconhecido",
+      });
+    },
+  });
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    // Handle form submission logic here
-    console.log("Form submitted:", formData);
+    createExamMutation.mutate(formData);
   };
 
   return (
@@ -68,64 +139,99 @@ const AgendarProva = () => {
       {/* Form Section */}
       <form onSubmit={handleSubmit} className="space-y-6 mb-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Student Name */}
+          {/* Student Selection */}
           <div className="space-y-2">
-            <Label htmlFor="studentName">Nome do Aluno</Label>
-            <Input
-              id="studentName"
-              name="studentName"
-              value={formData.studentName}
-              onChange={handleInputChange}
-              placeholder="Digite o nome do aluno"
-            />
+            <Label htmlFor="studentId">Aluno</Label>
+            <Select
+              value={formData.studentId}
+              onValueChange={(value) => 
+                setFormData(prev => ({ ...prev, studentId: value }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o aluno" />
+              </SelectTrigger>
+              <SelectContent>
+                {loadingStudents ? (
+                  <SelectItem value="loading">Carregando alunos...</SelectItem>
+                ) : students?.map((student) => (
+                  <SelectItem key={student.id} value={student.id}>
+                    {student.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
-          {/* Module Name */}
+          {/* Exam Type */}
           <div className="space-y-2">
-            <Label htmlFor="moduleName">Nome do Módulo</Label>
-            <Input
-              id="moduleName"
-              name="moduleName"
-              value={formData.moduleName}
-              onChange={handleInputChange}
-              placeholder="Digite o nome do módulo"
-            />
+            <Label htmlFor="examType">Tipo da Prova</Label>
+            <Select
+              value={formData.examType}
+              onValueChange={(value: "P1" | "Rec.1" | "Rec.2") => 
+                setFormData(prev => ({ ...prev, examType: value }))
+              }
+            >
+              <SelectTrigger>
+                <SelectValue placeholder="Selecione o tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="P1">P1</SelectItem>
+                <SelectItem value="Rec.1">Rec.1</SelectItem>
+                <SelectItem value="Rec.2">Rec.2</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
 
           {/* Exam Date */}
           <div className="space-y-2">
-            <Label htmlFor="examDate">Data da Prova</Label>
-            <div className="relative">
-              <Input
-                id="examDate"
-                name="examDate"
-                type="date"
-                value={formData.examDate}
-                onChange={handleInputChange}
-                className="w-full"
-              />
-              <Calendar className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
+            <Label>Data da Prova</Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal",
+                    !formData.examDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formData.examDate ? (
+                    format(formData.examDate, "PPP")
+                  ) : (
+                    <span>Selecione uma data</span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={formData.examDate}
+                  onSelect={(date) =>
+                    setFormData(prev => ({ ...prev, examDate: date || new Date() }))
+                  }
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
           </div>
 
           {/* Computer Number */}
           <div className="space-y-2">
             <Label htmlFor="computerNumber">Número do Computador</Label>
             <Select
-              name="computerNumber"
+              value={formData.computerNumber}
               onValueChange={(value) =>
-                handleInputChange({
-                  target: { name: "computerNumber", value },
-                } as any)
+                setFormData(prev => ({ ...prev, computerNumber: value }))
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o computador" />
               </SelectTrigger>
               <SelectContent>
-                {Array.from({ length: 14 }, (_, i) => (
-                  <SelectItem key={i + 1} value={String(i + 1)}>
-                    Computador {i + 1}
+                {Array.from({ length: 14 }, (_, i) => i + 1).map((num) => (
+                  <SelectItem key={num} value={num.toString()}>
+                    Computador {num}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -136,11 +242,9 @@ const AgendarProva = () => {
           <div className="space-y-2">
             <Label htmlFor="shift">Turno</Label>
             <Select
-              name="shift"
+              value={formData.shift}
               onValueChange={(value) =>
-                handleInputChange({
-                  target: { name: "shift", value },
-                } as any)
+                setFormData(prev => ({ ...prev, shift: value }))
               }
             >
               <SelectTrigger>
@@ -157,29 +261,27 @@ const AgendarProva = () => {
           <div className="space-y-2">
             <Label htmlFor="classTime">Horário da Aula</Label>
             <Select
-              name="classTime"
+              value={formData.classTime}
               onValueChange={(value) =>
-                handleInputChange({
-                  target: { name: "classTime", value },
-                } as any)
+                setFormData(prev => ({ ...prev, classTime: value }))
               }
             >
               <SelectTrigger>
                 <SelectValue placeholder="Selecione o horário" />
               </SelectTrigger>
-              <SelectContent className="max-h-[300px]">
-                <SelectItem value="morning-1">Segunda a Quinta - 7:30 - 8:30</SelectItem>
-                <SelectItem value="morning-2">Segunda a Quinta - 8:30 - 9:30</SelectItem>
-                <SelectItem value="morning-3">Segunda a Quinta - 9:30 - 10:30</SelectItem>
-                <SelectItem value="afternoon-1">Segunda a Quinta - 14:00 - 15:00</SelectItem>
-                <SelectItem value="afternoon-2">Segunda a Quinta - 15:00 - 16:00</SelectItem>
-                <SelectItem value="afternoon-3">Segunda a Quinta - 16:00 - 17:00</SelectItem>
-                <SelectItem value="afternoon-4">Segunda a Quinta - 17:00 - 18:00</SelectItem>
-                <SelectItem value="afternoon-5">Segunda a Quinta - 18:00 - 19:00</SelectItem>
-                <SelectItem value="saturday-morning-1">Sábado - 7:30 - 9:30</SelectItem>
-                <SelectItem value="saturday-morning-2">Sábado - 9:30 - 11:30</SelectItem>
-                <SelectItem value="saturday-afternoon-1">Sábado - 14:00 - 16:00</SelectItem>
-                <SelectItem value="saturday-afternoon-2">Sábado - 16:00 - 18:00</SelectItem>
+              <SelectContent>
+                <SelectItem value="07:30 - 08:30">Segunda a Quinta - 7:30 - 8:30</SelectItem>
+                <SelectItem value="08:30 - 09:30">Segunda a Quinta - 8:30 - 9:30</SelectItem>
+                <SelectItem value="09:30 - 10:30">Segunda a Quinta - 9:30 - 10:30</SelectItem>
+                <SelectItem value="14:00 - 15:00">Segunda a Quinta - 14:00 - 15:00</SelectItem>
+                <SelectItem value="15:00 - 16:00">Segunda a Quinta - 15:00 - 16:00</SelectItem>
+                <SelectItem value="16:00 - 17:00">Segunda a Quinta - 16:00 - 17:00</SelectItem>
+                <SelectItem value="17:00 - 18:00">Segunda a Quinta - 17:00 - 18:00</SelectItem>
+                <SelectItem value="18:00 - 19:00">Segunda a Quinta - 18:00 - 19:00</SelectItem>
+                <SelectItem value="07:30 - 09:30">Sábado - 7:30 - 9:30</SelectItem>
+                <SelectItem value="09:30 - 11:30">Sábado - 9:30 - 11:30</SelectItem>
+                <SelectItem value="14:00 - 16:00">Sábado - 14:00 - 16:00</SelectItem>
+                <SelectItem value="16:00 - 18:00">Sábado - 16:00 - 18:00</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -187,19 +289,20 @@ const AgendarProva = () => {
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-          <button
+          <Button
             type="submit"
-            className="px-6 py-2 bg-primary text-white rounded-md hover:bg-primary-gold transition-colors duration-200"
+            className="bg-primary text-white hover:bg-primary-gold transition-colors duration-200"
+            disabled={createExamMutation.isPending}
           >
-            Salvar Agendamento
-          </button>
-          <button
+            {createExamMutation.isPending ? "Salvando..." : "Salvar Agendamento"}
+          </Button>
+          <Button
             type="button"
             onClick={() => navigate("/admin/dashboard/resultados")}
-            className="px-6 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300 transition-colors duration-200"
+            className="bg-gray-200 text-gray-700 hover:bg-gray-300 transition-colors duration-200"
           >
             Ver Provas Pendentes
-          </button>
+          </Button>
         </div>
       </form>
 
@@ -213,7 +316,7 @@ const AgendarProva = () => {
             <thead>
               <tr className="bg-gray-100">
                 <th className="p-3 text-left">Aluno</th>
-                <th className="p-3 text-left">Módulo</th>
+                <th className="p-3 text-left">Tipo</th>
                 <th className="p-3 text-left">Data</th>
                 <th className="p-3 text-left">Computador</th>
                 <th className="p-3 text-left">Turno</th>
@@ -221,19 +324,33 @@ const AgendarProva = () => {
               </tr>
             </thead>
             <tbody>
-              {recentAppointments.map((appointment) => (
-                <tr
-                  key={appointment.id}
-                  className="border-b border-gray-200 hover:bg-gray-50"
-                >
-                  <td className="p-3">{appointment.studentName}</td>
-                  <td className="p-3">{appointment.moduleName}</td>
-                  <td className="p-3">{appointment.examDate}</td>
-                  <td className="p-3">{appointment.computerNumber}</td>
-                  <td className="p-3">{appointment.shift}</td>
-                  <td className="p-3">{appointment.classTime}</td>
+              {loadingExams ? (
+                <tr>
+                  <td colSpan={6} className="text-center py-4">
+                    Carregando agendamentos recentes...
+                  </td>
                 </tr>
-              ))}
+              ) : recentExams && recentExams.length > 0 ? (
+                recentExams.map((exam) => (
+                  <tr
+                    key={exam.id}
+                    className="border-b border-gray-200 hover:bg-gray-50"
+                  >
+                    <td className="p-3">{exam.users.name}</td>
+                    <td className="p-3">{exam.exam_type}</td>
+                    <td className="p-3">{format(new Date(exam.exam_date), "dd/MM/yyyy")}</td>
+                    <td className="p-3">PC-{String(exam.computer_number).padStart(2, '0')}</td>
+                    <td className="p-3">{exam.shift === 'morning' ? 'Manhã' : 'Tarde'}</td>
+                    <td className="p-3">{exam.class_time}</td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="text-center py-4 text-gray-500">
+                    Nenhum agendamento recente encontrado.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

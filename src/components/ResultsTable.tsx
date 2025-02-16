@@ -53,21 +53,25 @@ export const ResultsTable = ({
                 <TableCell>
                   <span
                     className={`px-2 py-1 rounded-full text-xs md:text-sm ${
-                      prova.status === "Aprovado"
+                      prova.status === "approved"
                         ? "bg-green-100 text-green-800"
-                        : prova.status === "Reprovado"
+                        : prova.status === "failed"
                         ? "bg-red-100 text-red-800"
                         : "bg-yellow-100 text-yellow-800"
                     }`}
                   >
-                    {prova.status}
+                    {prova.status === "approved" 
+                      ? "Aprovado" 
+                      : prova.status === "failed" 
+                      ? "Reprovado" 
+                      : "Pendente"}
                   </span>
                 </TableCell>
                 <TableCell>{prova.tipoProva}</TableCell>
                 <TableCell>
-                  {prova.dataRecuperacao && (
+                  {prova.recovery_date && (
                     <div className="flex items-center space-x-2">
-                      <span>{format(new Date(prova.dataRecuperacao), 'dd/MM/yyyy')}</span>
+                      <span>{format(new Date(prova.recovery_date), 'dd/MM/yyyy')}</span>
                       <Popover>
                         <PopoverTrigger asChild>
                           <Button
@@ -82,8 +86,8 @@ export const ResultsTable = ({
                         <PopoverContent className="w-auto p-0" align="start">
                           <Calendar
                             mode="single"
-                            selected={new Date(prova.dataRecuperacao)}
-                            onSelect={(date) => onDataRecuperacaoChange(prova.id, date)}
+                            selected={new Date(prova.recovery_date)}
+                            onSelect={(date) => onDataRecuperacaoChange(Number(prova.id), date)}
                             initialFocus
                           />
                         </PopoverContent>
@@ -94,21 +98,21 @@ export const ResultsTable = ({
                 <TableCell>
                   <div className="flex flex-col md:flex-row gap-2">
                     <Button
-                      onClick={() => onResultado(prova.id, true)}
+                      onClick={() => onResultado(Number(prova.id), true)}
                       variant="outline"
                       size="sm"
                       className="bg-green-50 hover:bg-green-100 text-green-600"
-                      disabled={prova.status !== "Pendente"}
+                      disabled={prova.status !== "pending"}
                     >
                       <Check className="w-4 h-4 mr-1" />
                       <span className="whitespace-nowrap">Aprovado</span>
                     </Button>
                     <Button
-                      onClick={() => onResultado(prova.id, false)}
+                      onClick={() => onResultado(Number(prova.id), false)}
                       variant="outline"
                       size="sm"
                       className="bg-red-50 hover:bg-red-100 text-red-600"
-                      disabled={prova.status !== "Pendente"}
+                      disabled={prova.status !== "pending"}
                     >
                       <X className="w-4 h-4 mr-1" />
                       <span className="whitespace-nowrap">Reprovado</span>

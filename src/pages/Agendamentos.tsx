@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { Input } from "@/components/ui/input";
@@ -26,70 +27,75 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { Database } from "@/types/supabase";
 
-// Mock data for demonstration
-const mockData = [
-  {
-    id: 1,
-    aluno: "João Silva",
-    modulo: "Matemática Básica",
-    data: "2024-03-20",
-    horario: "14:00",
-    tipo: "P1",
-    status: "Pendente",
-    computador: "PC-01",
-  },
-  {
-    id: 2,
-    aluno: "Maria Santos",
-    modulo: "Português Avançado",
-    data: "2024-03-19",
-    horario: "15:30",
-    tipo: "Rec.1",
-    status: "Aprovado",
-    computador: "PC-05",
-  },
-  {
-    id: 3,
-    aluno: "Pedro Oliveira",
-    modulo: "Física Quântica",
-    data: "2024-03-21",
-    horario: "09:00",
-    tipo: "P1",
-    status: "Reprovado",
-    computador: "PC-12",
-  },
-];
+// Tipo para os exames com informações do aluno
+type ExamWithStudent = Database['public']['Tables']['exams']['Row'] & {
+  users: {
+    name: string;
+  };
+};
 
 const Agendamentos = () => {
   const [studentFilter, setStudentFilter] = useState("");
-  const [moduleFilter, setModuleFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [computerFilter, setComputerFilter] = useState("all");
   const [date, setDate] = useState<Date>();
+
+  // Consulta os exames no Supabase
+  const { data: exams, isLoading } = useQuery({
+    queryKey: ['exams'],
+    queryFn: async () => {
+      if (!supabase) throw new Error("Cliente Supabase não inicializado");
+
+      const { data, error } = await supabase
+        .from('exams')
+        .select(`
+          *,
+          users:student_id (
+            name
+          )
+        `)
+        .order('exam_date', { ascending: true });
+
+      if (error) throw error;
+      return data as ExamWithStudent[];
+    },
+  });
 
   // Generate array of PCs for the select options
   const computers = Array.from({ length: 14 }, (_, i) => `PC-${String(i + 1).padStart(2, '0')}`);
 
   const getStatusColor = (status: string) => {
-    switch (status.toLowerCase()) {
-      case "aprovado":
+    switch (status) {
+      case "approved":
         return "text-green-600";
-      case "reprovado":
+      case "failed":
         return "text-red-600";
       default:
         return "text-yellow-600";
     }
   };
 
-  const filteredData = mockData.filter((item) => {
-    const matchesStudent = item.aluno.toLowerCase().includes(studentFilter.toLowerCase());
-    const matchesModule = item.modulo.toLowerCase().includes(moduleFilter.toLowerCase());
-    const matchesStatus = statusFilter === "all" || item.status === statusFilter;
-    const matchesComputer = computerFilter === "all" || item.computador === computerFilter;
-    const matchesDate = !date || format(new Date(item.data), "yyyy-MM-dd") === format(date, "yyyy-MM-dd");
+  const translateStatus = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "Aprovado";
+      case "failed":
+        return "Reprovado";
+      default:
+        return "Pendente";
+    }
+  };
+
+  const filteredExams = exams?.filter((exam) => {
+    const matchesStudent = exam.users.name.toLowerCase().includes(studentFilter.toLowerCase());
+    const matchesStatus = statusFilter === "all" || exam.status === statusFilter;
+    const matchesComputer = computerFilter === "all" || `PC-${String(exam.computer_number).padStart(2, '0')}` === computerFilter;
+    const matchesDate = !date || format(new Date(exam.exam_date), "yyyy-MM-dd") === format(date, "yyyy-MM-dd");
     
-    return matchesStudent && matchesModule && matchesStatus && matchesComputer && matchesDate;
+    return matchesStudent && matchesStatus && matchesComputer && matchesDate;
   });
 
   return (
@@ -97,22 +103,13 @@ const Agendamentos = () => {
       <Navbar />
       <main className="flex-grow container mx-auto px-4 py-8 mt-16">
         {/* Filters Section */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-8 bg-white p-6 rounded-lg shadow-md">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8 bg-white p-6 rounded-lg shadow-md">
           <div className="space-y-2">
             <Label>Nome do Aluno</Label>
             <Input
               placeholder="Digite o nome do aluno"
               value={studentFilter}
               onChange={(e) => setStudentFilter(e.target.value)}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>Nome do Módulo</Label>
-            <Input
-              placeholder="Digite o nome do módulo"
-              value={moduleFilter}
-              onChange={(e) => setModuleFilter(e.target.value)}
             />
           </div>
 
@@ -124,9 +121,9 @@ const Agendamentos = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="Pendente">Pendente</SelectItem>
-                <SelectItem value="Aprovado">Aprovado</SelectItem>
-                <SelectItem value="Reprovado">Reprovado</SelectItem>
+                <SelectItem value="pending">Pendente</SelectItem>
+                <SelectItem value="approved">Aprovado</SelectItem>
+                <SelectItem value="failed">Reprovado</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -192,7 +189,6 @@ const Agendamentos = () => {
             <TableHeader>
               <TableRow className="bg-primary hover:bg-primary/90">
                 <TableHead className="text-white font-semibold">Aluno</TableHead>
-                <TableHead className="text-white font-semibold">Módulo</TableHead>
                 <TableHead className="text-white font-semibold">Data</TableHead>
                 <TableHead className="text-white font-semibold">Horário</TableHead>
                 <TableHead className="text-white font-semibold">Tipo</TableHead>
@@ -201,31 +197,39 @@ const Agendamentos = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredData.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="hover:bg-primary/5 transition-colors"
-                >
-                  <TableCell>{row.aluno}</TableCell>
-                  <TableCell>{row.modulo}</TableCell>
-                  <TableCell>
-                    {format(new Date(row.data), "dd/MM/yyyy")}
+              {isLoading ? (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-4">
+                    Carregando agendamentos...
                   </TableCell>
-                  <TableCell>{row.horario}</TableCell>
-                  <TableCell>{row.tipo}</TableCell>
-                  <TableCell className={getStatusColor(row.status)}>
-                    {row.status}
-                  </TableCell>
-                  <TableCell>{row.computador}</TableCell>
                 </TableRow>
-              ))}
+              ) : filteredExams && filteredExams.length > 0 ? (
+                filteredExams.map((exam) => (
+                  <TableRow
+                    key={exam.id}
+                    className="hover:bg-primary/5 transition-colors"
+                  >
+                    <TableCell>{exam.users.name}</TableCell>
+                    <TableCell>
+                      {format(new Date(exam.exam_date), "dd/MM/yyyy")}
+                    </TableCell>
+                    <TableCell>{exam.class_time}</TableCell>
+                    <TableCell>{exam.exam_type}</TableCell>
+                    <TableCell className={getStatusColor(exam.status)}>
+                      {translateStatus(exam.status)}
+                    </TableCell>
+                    <TableCell>PC-{String(exam.computer_number).padStart(2, '0')}</TableCell>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
+                    Nenhum agendamento encontrado com os filtros selecionados.
+                  </TableCell>
+                </TableRow>
+              )}
             </TableBody>
           </Table>
-          {filteredData.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
-              Nenhum agendamento encontrado com os filtros selecionados.
-            </div>
-          )}
         </div>
       </main>
       <Footer />

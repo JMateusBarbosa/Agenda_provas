@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,44 +17,97 @@ import { ptBR } from "date-fns/locale";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/lib/supabase";
+import { Database } from "@/types/supabase";
+import { useToast } from "@/hooks/use-toast";
+
+// Tipo para os exames com informações do aluno
+type ExamWithStudent = Database['public']['Tables']['exams']['Row'] & {
+  users: {
+    name: string;
+  };
+};
 
 const AdminAgendamentos = () => {
+  const { toast } = useToast();
   const [date, setDate] = useState<Date>();
   const [searchTerm, setSearchTerm] = useState("");
   const [moduleFilter, setModuleFilter] = useState("");
   const [selectedStatus, setSelectedStatus] = useState("all");
   const [computerFilter, setComputerFilter] = useState("all");
 
+  // Consulta os exames no Supabase
+  const { data: exams, isLoading } = useQuery({
+    queryKey: ['admin-exams'],
+    queryFn: async () => {
+      if (!supabase) {
+        toast({
+          variant: "destructive",
+          title: "Erro",
+          description: "Cliente Supabase não inicializado",
+        });
+        throw new Error("Cliente Supabase não inicializado");
+      }
+
+      const { data, error } = await supabase
+        .from('exams')
+        .select(`
+          *,
+          users:student_id (
+            name
+          )
+        `)
+        .order('exam_date', { ascending: true });
+
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Erro ao carregar agendamentos",
+          description: error.message,
+        });
+        throw error;
+      }
+      
+      return data as ExamWithStudent[];
+    },
+  });
+
   // Generate array of PCs for the select options
   const computers = Array.from({ length: 14 }, (_, i) => `PC-${String(i + 1).padStart(2, '0')}`);
 
-  // Mock data - replace with actual data from your backend
-  const exams = [
-    {
-      id: 1,
-      studentName: "João Silva",
-      moduleName: "JavaScript Básico",
-      examDate: "2024-03-20",
-      computerNumber: "PC-05",
-      status: "Pendente",
-      classTime: "8:30 - 9:30",
-    },
-    // Add more mock data as needed
-  ];
+  const translateStatus = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "Aprovado";
+      case "failed":
+        return "Reprovado";
+      default:
+        return "Pendente";
+    }
+  };
 
-  const filteredExams = exams.filter((exam) => {
-    const matchesSearch = exam.studentName
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "approved":
+        return "bg-green-100 text-green-800";
+      case "failed":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-yellow-100 text-yellow-800";
+    }
+  };
+
+  const filteredExams = exams?.filter((exam) => {
+    const matchesSearch = exam.users.name
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
-    const matchesModule = moduleFilter === "" || exam.moduleName
+    const matchesModule = moduleFilter === "" || exam.exam_type
       .toLowerCase()
       .includes(moduleFilter.toLowerCase());
     const matchesStatus = selectedStatus === "all" || exam.status === selectedStatus;
-    const matchesComputer = computerFilter === "all" || exam.computerNumber === computerFilter;
-    const matchesDate =
-      !date ||
-      format(new Date(exam.examDate), "yyyy-MM-dd") ===
-        format(date, "yyyy-MM-dd");
+    const matchesComputer = computerFilter === "all" || `PC-${String(exam.computer_number).padStart(2, '0')}` === computerFilter;
+    const matchesDate = !date || format(new Date(exam.exam_date), "yyyy-MM-dd") === format(date, "yyyy-MM-dd");
+    
     return matchesSearch && matchesModule && matchesStatus && matchesComputer && matchesDate;
   });
 
@@ -75,9 +129,9 @@ const AdminAgendamentos = () => {
         </div>
 
         <div className="space-y-2">
-          <Label>Nome do Módulo</Label>
+          <Label>Tipo de Prova</Label>
           <Input
-            placeholder="Digite o nome do módulo"
+            placeholder="Digite o tipo da prova"
             value={moduleFilter}
             onChange={(e) => setModuleFilter(e.target.value)}
           />
@@ -91,9 +145,9 @@ const AdminAgendamentos = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="Pendente">Pendente</SelectItem>
-              <SelectItem value="Aprovado">Aprovado</SelectItem>
-              <SelectItem value="Reprovado">Reprovado</SelectItem>
+              <SelectItem value="pending">Pendente</SelectItem>
+              <SelectItem value="approved">Aprovado</SelectItem>
+              <SelectItem value="failed">Reprovado</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -159,7 +213,7 @@ const AdminAgendamentos = () => {
           <thead>
             <tr className="bg-muted">
               <th className="p-3 text-left font-semibold">Aluno</th>
-              <th className="p-3 text-left font-semibold">Módulo</th>
+              <th className="p-3 text-left font-semibold">Tipo</th>
               <th className="p-3 text-left font-semibold">Data</th>
               <th className="p-3 text-left font-semibold">Computador</th>
               <th className="p-3 text-left font-semibold">Status</th>
@@ -167,30 +221,42 @@ const AdminAgendamentos = () => {
             </tr>
           </thead>
           <tbody>
-            {filteredExams.map((exam) => (
-              <tr
-                key={exam.id}
-                className="border-b border-border hover:bg-muted/50 transition-colors"
-              >
-                <td className="p-3">{exam.studentName}</td>
-                <td className="p-3">{exam.moduleName}</td>
-                <td className="p-3">
-                  {format(new Date(exam.examDate), "dd/MM/yyyy")}
+            {isLoading ? (
+              <tr>
+                <td colSpan={6} className="text-center py-4">
+                  Carregando agendamentos...
                 </td>
-                <td className="p-3">{exam.computerNumber}</td>
-                <td className="p-3">{exam.status}</td>
-                <td className="p-3">{exam.classTime}</td>
               </tr>
-            ))}
+            ) : filteredExams && filteredExams.length > 0 ? (
+              filteredExams.map((exam) => (
+                <tr
+                  key={exam.id}
+                  className="border-b border-border hover:bg-muted/50 transition-colors"
+                >
+                  <td className="p-3">{exam.users.name}</td>
+                  <td className="p-3">{exam.exam_type}</td>
+                  <td className="p-3">
+                    {format(new Date(exam.exam_date), "dd/MM/yyyy")}
+                  </td>
+                  <td className="p-3">PC-{String(exam.computer_number).padStart(2, '0')}</td>
+                  <td className="p-3">
+                    <span className={`px-2 py-1 rounded-full text-xs md:text-sm ${getStatusColor(exam.status)}`}>
+                      {translateStatus(exam.status)}
+                    </span>
+                  </td>
+                  <td className="p-3">{exam.class_time}</td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan={6} className="text-center py-8 text-muted-foreground">
+                  Nenhum agendamento encontrado com os filtros selecionados.
+                </td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-
-      {filteredExams.length === 0 && (
-        <div className="text-center py-8 text-muted-foreground">
-          Nenhum agendamento encontrado com os filtros selecionados.
-        </div>
-      )}
     </div>
   );
 };
