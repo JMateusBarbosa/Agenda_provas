@@ -29,19 +29,20 @@ function App() {
       <BrowserRouter>
         <AuthProvider>
           <TooltipProvider>
-            <Toaster />
-            <Sonner />
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/agendamentos" element={<Agendamentos />} />
               <Route path="/admin" element={<AdminLogin />} />
               <Route path="/admin/dashboard" element={<AdminDashboard />}>
+                <Route index element={<AgendarProva />} />
                 <Route path="agendamentos" element={<AdminAgendamentos />} />
                 <Route path="agendar" element={<AgendarProva />} />
                 <Route path="resultados" element={<RegistroResultados />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
+            <Toaster />
+            <Sonner />
           </TooltipProvider>
         </AuthProvider>
       </BrowserRouter>

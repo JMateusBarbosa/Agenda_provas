@@ -24,6 +24,11 @@ const AdminLogin = () => {
       await signIn(email, password);
     } catch (error) {
       console.error("Erro no login:", error);
+      toast({
+        variant: "destructive",
+        title: "Erro no login",
+        description: "Verifique suas credenciais e tente novamente.",
+      });
     } finally {
       setIsLoading(false);
     }

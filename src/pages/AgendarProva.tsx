@@ -1,6 +1,7 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
@@ -34,6 +35,35 @@ const AgendarProva = () => {
     shift: "",
     classTime: "",
     examType: "P1" as "P1" | "Rec.1" | "Rec.2",
+  });
+
+  // Query para buscar exames recentes
+  const { data: recentExams, isLoading: loadingExams } = useQuery({
+    queryKey: ['recent-exams'],
+    queryFn: async () => {
+      if (!supabase) throw new Error("Cliente Supabase não inicializado");
+      
+      const { data, error } = await supabase
+        .from('exams')
+        .select(`
+          id,
+          student_name,
+          exam_type,
+          exam_date,
+          computer_number,
+          shift,
+          class_time,
+          users (
+            name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (error) throw error;
+      return data;
+    }
   });
 
   // Mutation para criar novo agendamento
@@ -287,7 +317,7 @@ const AgendarProva = () => {
                     key={exam.id}
                     className="border-b border-gray-200 hover:bg-gray-50"
                   >
-                    <td className="p-3">{exam.users.name}</td>
+                    <td className="p-3">{exam.student_name}</td>
                     <td className="p-3">{exam.exam_type}</td>
                     <td className="p-3">{format(new Date(exam.exam_date), "dd/MM/yyyy")}</td>
                     <td className="p-3">PC-{String(exam.computer_number).padStart(2, '0')}</td>
