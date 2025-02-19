@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -7,7 +6,9 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -37,29 +38,17 @@ const AgendarProva = () => {
     examType: "P1" as "P1" | "Rec.1" | "Rec.2",
   });
 
-  // Query para buscar exames recentes
-  const { data: recentExams, isLoading: loadingExams } = useQuery({
-    queryKey: ['recent-exams'],
+  // Query para buscar usuários estudantes
+  const { data: students } = useQuery({
+    queryKey: ['students'],
     queryFn: async () => {
       if (!supabase) throw new Error("Cliente Supabase não inicializado");
       
       const { data, error } = await supabase
-        .from('exams')
-        .select(`
-          id,
-          student_name,
-          exam_type,
-          exam_date,
-          computer_number,
-          shift,
-          class_time,
-          users (
-            name,
-            email
-          )
-        `)
-        .order('created_at', { ascending: false })
-        .limit(5);
+        .from('users')
+        .select('id, email, name')
+        .eq('role', 'student')
+        .order('name');
 
       if (error) throw error;
       return data;
@@ -72,10 +61,23 @@ const AgendarProva = () => {
       if (!supabase) throw new Error("Cliente Supabase não inicializado");
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      const { error } = await supabase
+      // Criar usuário temporário para o aluno
+      const { data: studentData, error: studentError } = await supabase
+        .from('users')
+        .insert({
+          name: examData.nomeAluno,
+          email: `temp_${Date.now()}@temp.com`,
+          role: 'student'
+        })
+        .select('id')
+        .single();
+
+      if (studentError) throw studentError;
+
+      const { error: examError } = await supabase
         .from('exams')
         .insert({
-          student_name: examData.nomeAluno,
+          student_id: studentData.id,
           exam_date: examData.examDate.toISOString(),
           computer_number: parseInt(examData.computerNumber),
           shift: examData.shift,
@@ -85,7 +87,7 @@ const AgendarProva = () => {
           status: 'pending'
         });
 
-      if (error) throw error;
+      if (examError) throw examError;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['recent-exams'] });
@@ -251,18 +253,49 @@ const AgendarProva = () => {
                 <SelectValue placeholder="Selecione o horário" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="07:30 - 08:30">Segunda a Quinta - 7:30 - 8:30</SelectItem>
-                <SelectItem value="08:30 - 09:30">Segunda a Quinta - 8:30 - 9:30</SelectItem>
-                <SelectItem value="09:30 - 10:30">Segunda a Quinta - 9:30 - 10:30</SelectItem>
-                <SelectItem value="14:00 - 15:00">Segunda a Quinta - 14:00 - 15:00</SelectItem>
-                <SelectItem value="15:00 - 16:00">Segunda a Quinta - 15:00 - 16:00</SelectItem>
-                <SelectItem value="16:00 - 17:00">Segunda a Quinta - 16:00 - 17:00</SelectItem>
-                <SelectItem value="17:00 - 18:00">Segunda a Quinta - 17:00 - 18:00</SelectItem>
-                <SelectItem value="18:00 - 19:00">Segunda a Quinta - 18:00 - 19:00</SelectItem>
-                <SelectItem value="07:30 - 09:30">Sábado - 7:30 - 9:30</SelectItem>
-                <SelectItem value="09:30 - 11:30">Sábado - 9:30 - 11:30</SelectItem>
-                <SelectItem value="14:00 - 16:00">Sábado - 14:00 - 16:00</SelectItem>
-                <SelectItem value="16:00 - 18:00">Sábado - 16:00 - 18:00</SelectItem>
+                <SelectGroup>
+                  <SelectLabel>Segunda a Quinta</SelectLabel>
+                  <SelectItem value="Segunda a Quinta - Manhã - 07:30 - 08:30">Manhã - 7:30 - 8:30</SelectItem>
+                  <SelectItem value="Segunda a Quinta - Manhã - 08:30 - 09:30">Manhã - 8:30 - 9:30</SelectItem>
+                  <SelectItem value="Segunda a Quinta - Manhã - 09:30 - 10:30">Manhã - 9:30 - 10:30</SelectItem>
+                  <SelectItem value="Segunda a Quinta - Tarde - 14:00 - 15:00">Tarde - 14:00 - 15:00</SelectItem>
+                  <SelectItem value="Segunda a Quinta - Tarde - 15:00 - 16:00">Tarde - 15:00 - 16:00</SelectItem>
+                  <SelectItem value="Segunda a Quinta - Tarde - 16:00 - 17:00">Tarde - 16:00 - 17:00</SelectItem>
+                  <SelectItem value="Segunda a Quinta - Tarde - 17:00 - 18:00">Tarde - 17:00 - 18:00</SelectItem>
+                  <SelectItem value="Segunda a Quinta - Tarde - 18:00 - 19:00">Tarde - 18:00 - 19:00</SelectItem>
+                </SelectGroup>
+                
+                <SelectGroup>
+                  <SelectLabel>Segunda e Quarta</SelectLabel>
+                  <SelectItem value="Segunda e Quarta - Manhã - 07:30 - 08:30">Manhã - 7:30 - 8:30</SelectItem>
+                  <SelectItem value="Segunda e Quarta - Manhã - 08:30 - 09:30">Manhã - 8:30 - 9:30</SelectItem>
+                  <SelectItem value="Segunda e Quarta - Manhã - 09:30 - 10:30">Manhã - 9:30 - 10:30</SelectItem>
+                  <SelectItem value="Segunda e Quarta - Tarde - 14:00 - 15:00">Tarde - 14:00 - 15:00</SelectItem>
+                  <SelectItem value="Segunda e Quarta - Tarde - 15:00 - 16:00">Tarde - 15:00 - 16:00</SelectItem>
+                  <SelectItem value="Segunda e Quarta - Tarde - 16:00 - 17:00">Tarde - 16:00 - 17:00</SelectItem>
+                  <SelectItem value="Segunda e Quarta - Tarde - 17:00 - 18:00">Tarde - 17:00 - 18:00</SelectItem>
+                  <SelectItem value="Segunda e Quarta - Tarde - 18:00 - 19:00">Tarde - 18:00 - 19:00</SelectItem>
+                </SelectGroup>
+
+                <SelectGroup>
+                  <SelectLabel>Terça e Quinta</SelectLabel>
+                  <SelectItem value="Terça e Quinta - Manhã - 07:30 - 08:30">Manhã - 7:30 - 8:30</SelectItem>
+                  <SelectItem value="Terça e Quinta - Manhã - 08:30 - 09:30">Manhã - 8:30 - 9:30</SelectItem>
+                  <SelectItem value="Terça e Quinta - Manhã - 09:30 - 10:30">Manhã - 9:30 - 10:30</SelectItem>
+                  <SelectItem value="Terça e Quinta - Tarde - 14:00 - 15:00">Tarde - 14:00 - 15:00</SelectItem>
+                  <SelectItem value="Terça e Quinta - Tarde - 15:00 - 16:00">Tarde - 15:00 - 16:00</SelectItem>
+                  <SelectItem value="Terça e Quinta - Tarde - 16:00 - 17:00">Tarde - 16:00 - 17:00</SelectItem>
+                  <SelectItem value="Terça e Quinta - Tarde - 17:00 - 18:00">Tarde - 17:00 - 18:00</SelectItem>
+                  <SelectItem value="Terça e Quinta - Tarde - 18:00 - 19:00">Tarde - 18:00 - 19:00</SelectItem>
+                </SelectGroup>
+
+                <SelectGroup>
+                  <SelectLabel>Sábado</SelectLabel>
+                  <SelectItem value="Sábado - Manhã - 07:30 - 09:30">Manhã - 7:30 - 9:30</SelectItem>
+                  <SelectItem value="Sábado - Manhã - 09:30 - 11:30">Manhã - 9:30 - 11:30</SelectItem>
+                  <SelectItem value="Sábado - Tarde - 14:00 - 16:00">Tarde - 14:00 - 16:00</SelectItem>
+                  <SelectItem value="Sábado - Tarde - 16:00 - 18:00">Tarde - 16:00 - 18:00</SelectItem>
+                </SelectGroup>
               </SelectContent>
             </Select>
           </div>
