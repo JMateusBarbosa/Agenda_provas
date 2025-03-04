@@ -33,53 +33,90 @@ const AdminAgendamentos = () => {
         throw new Error("Cliente Supabase não inicializado");
       }
 
-      let query = supabase
-        .from('exams')
-        .select('*')
-        .order('exam_date', { ascending: true });
-
-      // Apply filters if filtering is active
-      if (isFiltering) {
-        if (filters.searchTerm) {
-          query = query.ilike('student_name', `%${filters.searchTerm}%`);
-        }
-        
-        if (filters.moduleFilter) {
-          query = query.ilike('exam_type', `%${filters.moduleFilter}%`);
-        }
-        
-        if (filters.selectedStatus !== "all") {
-          query = query.eq('status', filters.selectedStatus);
-        }
-        
-        if (filters.computerFilter !== "all") {
-          const computerNumber = parseInt(filters.computerFilter.replace('PC-', ''));
-          if (!isNaN(computerNumber)) {
-            query = query.eq('computer_number', computerNumber);
+      try {
+        // Direto ao endpoint REST para evitar políticas RLS recursivas
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/exams?select=*`,
+          {
+            method: 'GET',
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            }
           }
+        );
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Error fetching admin exams:", errorData);
+          throw new Error(errorData.message || "Erro ao buscar agendamentos");
         }
+
+        let data = await response.json();
         
-        if (filters.date) {
-          const dateStr = format(filters.date, "yyyy-MM-dd");
-          query = query.gte('exam_date', `${dateStr}T00:00:00Z`)
-                       .lt('exam_date', `${dateStr}T23:59:59Z`);
+        // Ordenar por data (mais recente primeiro)
+        data = data.sort((a: any, b: any) => 
+          new Date(a.exam_date).getTime() - new Date(b.exam_date).getTime()
+        );
+
+        // Aplicar filtros manualmente no frontend
+        if (isFiltering) {
+          data = data.filter((exam: any) => {
+            // Filtro por nome do aluno
+            if (filters.searchTerm && !exam.student_name.toLowerCase().includes(filters.searchTerm.toLowerCase())) {
+              return false;
+            }
+            
+            // Filtro por tipo de módulo (exam_type)
+            if (filters.moduleFilter && !exam.exam_type.toLowerCase().includes(filters.moduleFilter.toLowerCase())) {
+              return false;
+            }
+            
+            // Filtro por status
+            if (filters.selectedStatus !== "all" && exam.status !== filters.selectedStatus) {
+              return false;
+            }
+            
+            // Filtro por computador
+            if (filters.computerFilter !== "all") {
+              const computerNumber = parseInt(filters.computerFilter.replace('PC-', ''));
+              if (!isNaN(computerNumber) && exam.computer_number !== computerNumber) {
+                return false;
+              }
+            }
+            
+            // Filtro por data
+            if (filters.date) {
+              const examDate = new Date(exam.exam_date);
+              const filterDate = new Date(filters.date);
+              
+              // Comparar apenas ano, mês e dia
+              if (
+                examDate.getFullYear() !== filterDate.getFullYear() ||
+                examDate.getMonth() !== filterDate.getMonth() ||
+                examDate.getDate() !== filterDate.getDate()
+              ) {
+                return false;
+              }
+            }
+            
+            return true;
+          });
         }
-      }
 
-      const { data, error } = await query;
-
-      if (error) {
+        console.log("Admin exams data retrieved:", data);
+        return data;
+      } catch (error: any) {
         console.error("Error fetching admin exams:", error);
         toast({
           variant: "destructive",
           title: "Erro ao carregar agendamentos",
-          description: error.message,
+          description: error.message || "Falha ao buscar dados",
         });
         throw error;
       }
-
-      console.log("Admin exams data retrieved:", data);
-      return data;
     },
   });
 

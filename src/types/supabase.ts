@@ -15,7 +15,6 @@ export interface Database {
       exams: {
         Row: {
           id: string                                   // ID único do exame
-          student_id: string                           // ID do aluno
           computer_number: number                      // Número do computador
           shift: "morning" | "afternoon"               // Turno do exame
           class_time: string                          // Horário da aula
@@ -26,10 +25,10 @@ export interface Database {
           created_by: string                          // ID do usuário que criou
           created_at: string                          // Data de criação
           updated_at: string                          // Data de atualização
+          student_name: string                        // Nome do aluno
         }
         Insert: {
           id?: string
-          student_id: string
           computer_number: number
           shift: "morning" | "afternoon"
           class_time: string
@@ -40,10 +39,10 @@ export interface Database {
           created_by: string
           created_at?: string
           updated_at?: string
+          student_name: string
         }
         Update: {
           id?: string
-          student_id?: string
           computer_number?: number
           shift?: "morning" | "afternoon"
           class_time?: string
@@ -54,6 +53,7 @@ export interface Database {
           created_by?: string
           created_at?: string
           updated_at?: string
+          student_name?: string
         }
       }
       // Tabela de usuários
