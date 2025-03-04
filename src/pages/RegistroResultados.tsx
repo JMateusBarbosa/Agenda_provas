@@ -19,50 +19,62 @@ const RegistroResultados = () => {
     queryKey: ['pending-exams'],
     queryFn: async () => {
       console.log("Fetching pending exams data");
-      if (!supabase) {
-        console.error("Cliente Supabase não inicializado");
-        toast({
-          variant: "destructive",
-          title: "Erro de conexão",
-          description: "Não foi possível conectar ao banco de dados.",
-        });
-        throw new Error("Cliente Supabase não inicializado");
-      }
+      
+      try {
+        // Usar o fetch nativo para buscar os dados
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/exams?select=*&status=eq.pending`,
+          {
+            method: 'GET',
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=representation'
+            }
+          }
+        );
 
-      const { data, error } = await supabase
-        .from('exams')
-        .select(`*`)
-        .eq('status', 'pending')
-        .order('exam_date', { ascending: true });
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Error fetching pending exams:", errorData);
+          throw new Error(errorData.message || "Erro ao buscar provas pendentes");
+        }
 
-      if (error) {
+        const data = await response.json();
+        console.log("Pending exams data retrieved:", data);
+
+        // Ordenar por data (mais recente primeiro)
+        const sortedData = data.sort((a: any, b: any) => 
+          new Date(a.exam_date).getTime() - new Date(b.exam_date).getTime()
+        );
+
+        return sortedData.map((exam: any) => ({
+          id: exam.id,
+          nomeAluno: exam.student_name,
+          modulo: "Módulo",
+          dataProva: exam.exam_date.split('T')[0],
+          status: exam.status,
+          tipoProva: exam.exam_type,
+          diasAula: exam.class_time.includes("Sábado") ? "Sábado" : 
+                  exam.class_time.includes("Segunda e Quarta") ? "Segunda e Quarta" :
+                  exam.class_time.includes("Terça e Quinta") ? "Terça e Quinta" : 
+                  "Segunda a Quinta",
+          computer_number: exam.computer_number,
+          shift: exam.shift,
+          class_time: exam.class_time,
+          created_by: exam.created_by,
+          recovery_date: exam.recovery_date
+        })) as ProvaType[];
+      } catch (error: any) {
         console.error("Error fetching pending exams:", error);
         toast({
           variant: "destructive",
           title: "Erro ao carregar provas",
-          description: error.message,
+          description: error.message || "Falha ao buscar dados",
         });
         throw error;
       }
-
-      console.log("Pending exams data retrieved:", data);
-      return data.map(exam => ({
-        id: exam.id,
-        nomeAluno: exam.student_name,
-        modulo: "Módulo",
-        dataProva: exam.exam_date.split('T')[0],
-        status: exam.status,
-        tipoProva: exam.exam_type,
-        diasAula: exam.class_time.includes("Sábado") ? "Sábado" : 
-                 exam.class_time.includes("Segunda e Quarta") ? "Segunda e Quarta" :
-                 exam.class_time.includes("Terça e Quinta") ? "Terça e Quinta" : 
-                 "Segunda a Quinta",
-        computer_number: exam.computer_number,
-        shift: exam.shift,
-        class_time: exam.class_time,
-        created_by: exam.created_by,
-        recovery_date: exam.recovery_date
-      })) as ProvaType[];
     },
   });
 
@@ -78,26 +90,38 @@ const RegistroResultados = () => {
       recoveryDate?: string;
     }) => {
       console.log("Updating exam result:", { examId, status, recoveryDate });
-      if (!supabase) {
-        console.error("Cliente Supabase não inicializado");
-        throw new Error("Cliente Supabase não inicializado");
-      }
+      
+      try {
+        const updateData: any = {
+          status,
+          updated_at: new Date().toISOString()
+        };
 
-      const updateData: any = {
-        status,
-        updated_at: new Date().toISOString()
-      };
+        if (recoveryDate) {
+          updateData.recovery_date = recoveryDate;
+        }
 
-      if (recoveryDate) {
-        updateData.recovery_date = recoveryDate;
-      }
+        // Usar o fetch nativo para atualizar os dados
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/exams?id=eq.${examId}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+              'Content-Type': 'application/json',
+              'Prefer': 'return=minimal'
+            },
+            body: JSON.stringify(updateData)
+          }
+        );
 
-      const { error } = await supabase
-        .from('exams')
-        .update(updateData)
-        .eq('id', examId);
-
-      if (error) {
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error("Error updating exam result:", errorData);
+          throw new Error(errorData.message || "Erro ao atualizar resultado");
+        }
+      } catch (error: any) {
         console.error("Error updating exam result:", error);
         throw error;
       }
@@ -150,27 +174,40 @@ const RegistroResultados = () => {
           recoveryDate: novaData.toISOString()
         });
         
-        // Criar novo agendamento para recuperação
-        if (supabase) {
-          const { error: createError } = await supabase
-            .from('exams')
-            .insert({
-              student_name: prova.nomeAluno,
-              exam_date: novaData.toISOString(),
-              computer_number: prova.computer_number,
-              shift: prova.shift,
-              class_time: prova.class_time,
-              exam_type: novoTipo,
-              status: 'pending',
-              created_by: prova.created_by
-            });
-
-          if (createError) {
-            console.error("Error creating recovery exam:", createError);
+        // Criar novo agendamento para recuperação usando fetch nativo
+        try {
+          const newExam = {
+            student_name: prova.nomeAluno,
+            exam_date: novaData.toISOString(),
+            computer_number: prova.computer_number,
+            shift: prova.shift,
+            class_time: prova.class_time,
+            exam_type: novoTipo,
+            status: 'pending',
+            created_by: prova.created_by
+          };
+          
+          const response = await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/exams`,
+            {
+              method: 'POST',
+              headers: {
+                'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal'
+              },
+              body: JSON.stringify(newExam)
+            }
+          );
+          
+          if (!response.ok) {
+            const errorData = await response.json();
+            console.error("Error creating recovery exam:", errorData);
             toast({
               variant: "destructive",
               title: "Erro ao agendar recuperação",
-              description: createError.message,
+              description: errorData.message || "Falha ao criar agendamento de recuperação",
             });
           } else {
             toast({
@@ -178,6 +215,13 @@ const RegistroResultados = () => {
               description: `Nova prova agendada para ${novaData.toLocaleDateString()}`,
             });
           }
+        } catch (error: any) {
+          console.error("Error creating recovery exam:", error);
+          toast({
+            variant: "destructive",
+            title: "Erro ao agendar recuperação",
+            description: error.message || "Falha ao criar agendamento de recuperação",
+          });
         }
       }
     }

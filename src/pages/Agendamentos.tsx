@@ -3,11 +3,9 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
-import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import FilterPanel from "@/components/agendamentos/FilterPanel";
 import ExamsTable from "@/components/agendamentos/ExamsTable";
-import { format } from "date-fns";
 
 const Agendamentos = () => {
   const { toast } = useToast();
@@ -24,18 +22,9 @@ const Agendamentos = () => {
     queryKey: ['exams', isFiltering, filters],
     queryFn: async () => {
       console.log("Fetching exams data with filters:", filters);
-      if (!supabase) {
-        console.error("Cliente Supabase não inicializado");
-        toast({
-          variant: "destructive",
-          title: "Erro de conexão",
-          description: "Não foi possível conectar ao banco de dados.",
-        });
-        throw new Error("Cliente Supabase não inicializado");
-      }
-
+      
       try {
-        // Direto ao endpoint REST para evitar políticas RLS recursivas
+        // Usar o fetch nativo para buscar os dados
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/exams?select=*`,
           {
@@ -56,6 +45,7 @@ const Agendamentos = () => {
         }
 
         let data = await response.json();
+        console.log("Raw exams data:", data);
         
         // Ordenar por data (mais recente primeiro)
         data = data.sort((a: any, b: any) => 
@@ -102,7 +92,7 @@ const Agendamentos = () => {
           });
         }
 
-        console.log("Exams data retrieved:", data);
+        console.log("Filtered exams data:", data);
         return data;
       } catch (error: any) {
         console.error("Error fetching exams:", error);
