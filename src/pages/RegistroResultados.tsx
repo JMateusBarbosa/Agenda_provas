@@ -18,7 +18,16 @@ const RegistroResultados = () => {
   const { data: provas, isLoading } = useQuery({
     queryKey: ['pending-exams'],
     queryFn: async () => {
-      if (!supabase) throw new Error("Cliente Supabase não inicializado");
+      console.log("Fetching pending exams data");
+      if (!supabase) {
+        console.error("Cliente Supabase não inicializado");
+        toast({
+          variant: "destructive",
+          title: "Erro de conexão",
+          description: "Não foi possível conectar ao banco de dados.",
+        });
+        throw new Error("Cliente Supabase não inicializado");
+      }
 
       const { data, error } = await supabase
         .from('exams')
@@ -26,8 +35,17 @@ const RegistroResultados = () => {
         .eq('status', 'pending')
         .order('exam_date', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error fetching pending exams:", error);
+        toast({
+          variant: "destructive",
+          title: "Erro ao carregar provas",
+          description: error.message,
+        });
+        throw error;
+      }
 
+      console.log("Pending exams data retrieved:", data);
       return data.map(exam => ({
         id: exam.id,
         nomeAluno: exam.student_name,
@@ -35,8 +53,10 @@ const RegistroResultados = () => {
         dataProva: exam.exam_date.split('T')[0],
         status: exam.status,
         tipoProva: exam.exam_type,
-        diasAula: exam.class_time.includes("Sábado") ? "Sábado" : "Segunda a Quinta",
-        student_id: "", // Esta coluna não existe mais
+        diasAula: exam.class_time.includes("Sábado") ? "Sábado" : 
+                 exam.class_time.includes("Segunda e Quarta") ? "Segunda e Quarta" :
+                 exam.class_time.includes("Terça e Quinta") ? "Terça e Quinta" : 
+                 "Segunda a Quinta",
         computer_number: exam.computer_number,
         shift: exam.shift,
         class_time: exam.class_time,
@@ -57,7 +77,11 @@ const RegistroResultados = () => {
       status: 'approved' | 'failed' | 'pending'; 
       recoveryDate?: string;
     }) => {
-      if (!supabase) throw new Error("Cliente Supabase não inicializado");
+      console.log("Updating exam result:", { examId, status, recoveryDate });
+      if (!supabase) {
+        console.error("Cliente Supabase não inicializado");
+        throw new Error("Cliente Supabase não inicializado");
+      }
 
       const updateData: any = {
         status,
@@ -73,7 +97,10 @@ const RegistroResultados = () => {
         .update(updateData)
         .eq('id', examId);
 
-      if (error) throw error;
+      if (error) {
+        console.error("Error updating exam result:", error);
+        throw error;
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pending-exams'] });
@@ -139,6 +166,7 @@ const RegistroResultados = () => {
             });
 
           if (createError) {
+            console.error("Error creating recovery exam:", createError);
             toast({
               variant: "destructive",
               title: "Erro ao agendar recuperação",

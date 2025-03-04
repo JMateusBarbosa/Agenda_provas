@@ -1,0 +1,188 @@
+
+import { useState } from "react";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import { Filter } from "lucide-react";
+import { CalendarIcon } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+
+interface AdminFilterPanelProps {
+  onApplyFilters: (filters: {
+    searchTerm: string;
+    moduleFilter: string;
+    selectedStatus: string;
+    computerFilter: string;
+    date?: Date;
+  }) => void;
+}
+
+const AdminFilterPanel = ({ onApplyFilters }: AdminFilterPanelProps) => {
+  const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [moduleFilter, setModuleFilter] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState("all");
+  const [computerFilter, setComputerFilter] = useState("all");
+  const [date, setDate] = useState<Date | undefined>(undefined);
+
+  // Generate array of PCs for the select options
+  const computers = Array.from({ length: 14 }, (_, i) => `PC-${String(i + 1).padStart(2, '0')}`);
+
+  const applyFilters = () => {
+    onApplyFilters({
+      searchTerm,
+      moduleFilter,
+      selectedStatus,
+      computerFilter,
+      date,
+    });
+    
+    toast({
+      title: "Filtros aplicados",
+      description: "Os resultados foram atualizados conforme os filtros.",
+    });
+  };
+
+  const clearFilters = () => {
+    setSearchTerm("");
+    setModuleFilter("");
+    setSelectedStatus("all");
+    setComputerFilter("all");
+    setDate(undefined);
+    
+    onApplyFilters({
+      searchTerm: "",
+      moduleFilter: "",
+      selectedStatus: "all",
+      computerFilter: "all",
+      date: undefined,
+    });
+    
+    toast({
+      title: "Filtros limpos",
+      description: "Mostrando todos os agendamentos.",
+    });
+  };
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4 mb-6">
+      <div className="space-y-2">
+        <Label>Nome do Aluno</Label>
+        <Input
+          placeholder="Digite o nome do aluno"
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Tipo de Prova</Label>
+        <Input
+          placeholder="Digite o tipo da prova"
+          value={moduleFilter}
+          onChange={(e) => setModuleFilter(e.target.value)}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>Status</Label>
+        <Select value={selectedStatus} onValueChange={setSelectedStatus}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione o status" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="pending">Pendente</SelectItem>
+            <SelectItem value="approved">Aprovado</SelectItem>
+            <SelectItem value="failed">Reprovado</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Computador</Label>
+        <Select value={computerFilter} onValueChange={setComputerFilter}>
+          <SelectTrigger>
+            <SelectValue placeholder="Selecione o computador" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            {computers.map((pc) => (
+              <SelectItem key={pc} value={pc}>
+                {pc}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>Data</Label>
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button
+              variant="outline"
+              className={cn(
+                "w-full justify-start text-left font-normal",
+                !date && "text-muted-foreground"
+              )}
+            >
+              <CalendarIcon className="mr-2 h-4 w-4" />
+              {date ? format(date, "dd/MM/yyyy") : "Selecione uma data"}
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="start">
+            <Calendar
+              mode="single"
+              selected={date}
+              onSelect={setDate}
+              locale={ptBR}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+        {date && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDate(undefined)}
+            className="mt-2 w-full"
+          >
+            Limpar Data
+          </Button>
+        )}
+      </div>
+
+      <div className="col-span-1 md:col-span-2 lg:col-span-3 xl:col-span-5 flex flex-col md:flex-row space-y-2 md:space-y-0 md:space-x-4 mt-4">
+        <Button 
+          onClick={applyFilters}
+          className="w-full md:w-auto"
+        >
+          <Filter className="w-4 h-4 mr-2" />
+          Aplicar Filtros
+        </Button>
+        <Button 
+          onClick={clearFilters}
+          variant="outline"
+          className="w-full md:w-auto"
+        >
+          Limpar Filtros
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+export default AdminFilterPanel;
