@@ -9,7 +9,7 @@ export interface ProvaType {
   status: 'pending' | 'approved' | 'failed';
   tipoProva: 'P1' | 'Rec.1' | 'Rec.2';
   diasAula: DiasAula;
-  student_id: string;
+  student_id?: string; // Optional now as it's been removed from DB
   computer_number: number;
   shift: 'morning' | 'afternoon';
   class_time: string;

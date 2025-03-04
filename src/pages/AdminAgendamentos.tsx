@@ -18,15 +18,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { Database } from "@/types/supabase";
 import { useToast } from "@/hooks/use-toast";
-
-// Tipo para os exames com informações do aluno
-type ExamWithStudent = Database['public']['Tables']['exams']['Row'] & {
-  users: {
-    name: string;
-  };
-};
 
 const AdminAgendamentos = () => {
   const { toast } = useToast();
@@ -51,12 +43,7 @@ const AdminAgendamentos = () => {
 
       const { data, error } = await supabase
         .from('exams')
-        .select(`
-          *,
-          users:student_id (
-            name
-          )
-        `)
+        .select(`*`)
         .order('exam_date', { ascending: true });
 
       if (error) {
@@ -68,7 +55,7 @@ const AdminAgendamentos = () => {
         throw error;
       }
       
-      return data as ExamWithStudent[];
+      return data;
     },
   });
 
@@ -98,7 +85,7 @@ const AdminAgendamentos = () => {
   };
 
   const filteredExams = exams?.filter((exam) => {
-    const matchesSearch = exam.users.name
+    const matchesSearch = exam.student_name
       .toLowerCase()
       .includes(searchTerm.toLowerCase());
     const matchesModule = moduleFilter === "" || exam.exam_type
@@ -233,7 +220,7 @@ const AdminAgendamentos = () => {
                   key={exam.id}
                   className="border-b border-border hover:bg-muted/50 transition-colors"
                 >
-                  <td className="p-3">{exam.users.name}</td>
+                  <td className="p-3">{exam.student_name}</td>
                   <td className="p-3">{exam.exam_type}</td>
                   <td className="p-3">
                     {format(new Date(exam.exam_date), "dd/MM/yyyy")}

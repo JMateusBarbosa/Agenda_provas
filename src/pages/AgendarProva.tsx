@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
@@ -38,21 +39,23 @@ const AgendarProva = () => {
     examType: "P1" as "P1" | "Rec.1" | "Rec.2",
   });
 
-  // Query para buscar usuários estudantes
-  const { data: students } = useQuery({
-    queryKey: ['students'],
+  // Query para buscar provas recentes
+  const { data: recentExams, isLoading: loadingExams } = useQuery({
+    queryKey: ['recent-exams'],
     queryFn: async () => {
       if (!supabase) throw new Error("Cliente Supabase não inicializado");
       
       const { data, error } = await supabase
-        .from('users')
-        .select('id, email, name')
-        .eq('role', 'student')
-        .order('name');
+        .from('exams')
+        .select(`*`)
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       if (error) throw error;
+      
       return data;
-    }
+    },
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   // Mutation para criar novo agendamento
@@ -61,23 +64,10 @@ const AgendarProva = () => {
       if (!supabase) throw new Error("Cliente Supabase não inicializado");
       if (!user?.id) throw new Error("Usuário não autenticado");
 
-      // Criar usuário temporário para o aluno
-      const { data: studentData, error: studentError } = await supabase
-        .from('users')
-        .insert({
-          name: examData.nomeAluno,
-          email: `temp_${Date.now()}@temp.com`,
-          role: 'student'
-        })
-        .select('id')
-        .single();
-
-      if (studentError) throw studentError;
-
       const { error: examError } = await supabase
         .from('exams')
         .insert({
-          student_id: studentData.id,
+          student_name: examData.nomeAluno,
           exam_date: examData.examDate.toISOString(),
           computer_number: parseInt(examData.computerNumber),
           shift: examData.shift,

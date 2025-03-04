@@ -22,12 +22,7 @@ const RegistroResultados = () => {
 
       const { data, error } = await supabase
         .from('exams')
-        .select(`
-          *,
-          users:student_id (
-            name
-          )
-        `)
+        .select(`*`)
         .eq('status', 'pending')
         .order('exam_date', { ascending: true });
 
@@ -35,13 +30,13 @@ const RegistroResultados = () => {
 
       return data.map(exam => ({
         id: exam.id,
-        nomeAluno: exam.users.name,
+        nomeAluno: exam.student_name,
         modulo: "Módulo",
         dataProva: exam.exam_date.split('T')[0],
         status: exam.status,
         tipoProva: exam.exam_type,
         diasAula: exam.class_time.includes("Sábado") ? "Sábado" : "Segunda a Quinta",
-        student_id: exam.student_id,
+        student_id: "", // Esta coluna não existe mais
         computer_number: exam.computer_number,
         shift: exam.shift,
         class_time: exam.class_time,
@@ -133,7 +128,7 @@ const RegistroResultados = () => {
           const { error: createError } = await supabase
             .from('exams')
             .insert({
-              student_id: prova.student_id,
+              student_name: prova.nomeAluno,
               exam_date: novaData.toISOString(),
               computer_number: prova.computer_number,
               shift: prova.shift,

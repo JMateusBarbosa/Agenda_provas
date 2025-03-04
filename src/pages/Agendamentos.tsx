@@ -28,14 +28,6 @@ import { ptBR } from "date-fns/locale";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
-import { Database } from "@/types/supabase";
-
-// Tipo para os exames com informações do aluno
-type ExamWithStudent = Database['public']['Tables']['exams']['Row'] & {
-  users: {
-    name: string;
-  };
-};
 
 const Agendamentos = () => {
   const [studentFilter, setStudentFilter] = useState("");
@@ -51,16 +43,11 @@ const Agendamentos = () => {
 
       const { data, error } = await supabase
         .from('exams')
-        .select(`
-          *,
-          users:student_id (
-            name
-          )
-        `)
+        .select(`*`)
         .order('exam_date', { ascending: true });
 
       if (error) throw error;
-      return data as ExamWithStudent[];
+      return data;
     },
   });
 
@@ -90,7 +77,7 @@ const Agendamentos = () => {
   };
 
   const filteredExams = exams?.filter((exam) => {
-    const matchesStudent = exam.users.name.toLowerCase().includes(studentFilter.toLowerCase());
+    const matchesStudent = exam.student_name.toLowerCase().includes(studentFilter.toLowerCase());
     const matchesStatus = statusFilter === "all" || exam.status === statusFilter;
     const matchesComputer = computerFilter === "all" || `PC-${String(exam.computer_number).padStart(2, '0')}` === computerFilter;
     const matchesDate = !date || format(new Date(exam.exam_date), "yyyy-MM-dd") === format(date, "yyyy-MM-dd");
@@ -209,7 +196,7 @@ const Agendamentos = () => {
                     key={exam.id}
                     className="hover:bg-primary/5 transition-colors"
                   >
-                    <TableCell>{exam.users.name}</TableCell>
+                    <TableCell>{exam.student_name}</TableCell>
                     <TableCell>
                       {format(new Date(exam.exam_date), "dd/MM/yyyy")}
                     </TableCell>
