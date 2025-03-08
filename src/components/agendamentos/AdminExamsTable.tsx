@@ -9,6 +9,7 @@ interface Exam {
   status: string;
   computer_number: number;
   class_time: string;
+  recovery_date?: string;
 }
 
 interface AdminExamsTableProps {
@@ -49,13 +50,14 @@ const AdminExamsTable = ({ exams, isLoading }: AdminExamsTableProps) => {
             <th className="p-3 text-left font-semibold">Data</th>
             <th className="p-3 text-left font-semibold">Computador</th>
             <th className="p-3 text-left font-semibold">Status</th>
+            <th className="p-3 text-left font-semibold">Recuperação</th>
             <th className="p-3 text-left font-semibold">Horário</th>
           </tr>
         </thead>
         <tbody>
           {isLoading ? (
             <tr>
-              <td colSpan={6} className="text-center py-4">
+              <td colSpan={7} className="text-center py-4">
                 Carregando agendamentos...
               </td>
             </tr>
@@ -76,12 +78,15 @@ const AdminExamsTable = ({ exams, isLoading }: AdminExamsTableProps) => {
                     {translateStatus(exam.status)}
                   </span>
                 </td>
+                <td className="p-3">
+                  {exam.recovery_date && format(new Date(exam.recovery_date), "dd/MM/yyyy")}
+                </td>
                 <td className="p-3">{exam.class_time}</td>
               </tr>
             ))
           ) : (
             <tr>
-              <td colSpan={6} className="text-center py-8 text-muted-foreground">
+              <td colSpan={7} className="text-center py-8 text-muted-foreground">
                 Nenhum agendamento encontrado com os filtros selecionados.
               </td>
             </tr>

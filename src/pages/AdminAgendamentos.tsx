@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
 import AdminFilterPanel from "@/components/agendamentos/AdminFilterPanel";
 import AdminExamsTable from "@/components/agendamentos/AdminExamsTable";
 
@@ -22,38 +23,51 @@ const AdminAgendamentos = () => {
     queryFn: async () => {
       console.log("Admin: Fetching exams data with filters:", filters);
       
+      if (!supabase) {
+        throw new Error("Cliente Supabase não inicializado");
+      }
+      
       try {
-        // Usar o fetch nativo para buscar os dados
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/exams?select=*`,
-          {
-            method: 'GET',
-            headers: {
-              'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-              'Content-Type': 'application/json',
-              'Prefer': 'return=representation'
-            }
-          }
-        );
-
-        if (!response.ok) {
-          const errorData = await response.json();
-          console.error("Error fetching admin exams:", errorData);
-          throw new Error(errorData.message || "Erro ao buscar agendamentos");
+        let query = supabase
+          .from('exams')
+          .select('*');
+        
+        // Aplicar filtros na consulta Supabase quando possível
+        if (filters.selectedStatus !== "all") {
+          query = query.eq('status', filters.selectedStatus);
         }
 
-        let data = await response.json();
+        if (filters.computerFilter !== "all") {
+          const computerNumber = parseInt(filters.computerFilter.replace('PC-', ''));
+          if (!isNaN(computerNumber)) {
+            query = query.eq('computer_number', computerNumber);
+          }
+        }
+
+        if (filters.date) {
+          const filterDate = new Date(filters.date);
+          // Converter para string ISO sem horas
+          const dateStr = filterDate.toISOString().split('T')[0];
+          query = query.ilike('exam_date', `${dateStr}%`);
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error("Error fetching admin exams:", error);
+          throw new Error(error.message || "Erro ao buscar agendamentos");
+        }
+
         console.log("Raw admin exams data:", data);
         
         // Ordenar por data (mais recente primeiro)
-        data = data.sort((a: any, b: any) => 
+        let filteredData = data.sort((a: any, b: any) => 
           new Date(a.exam_date).getTime() - new Date(b.exam_date).getTime()
         );
 
-        // Aplicar filtros manualmente no frontend
+        // Aplicar filtros adicionais no cliente
         if (isFiltering) {
-          data = data.filter((exam: any) => {
+          filteredData = filteredData.filter((exam: any) => {
             // Filtro por nome do aluno
             if (filters.searchTerm && !exam.student_name.toLowerCase().includes(filters.searchTerm.toLowerCase())) {
               return false;
@@ -64,40 +78,12 @@ const AdminAgendamentos = () => {
               return false;
             }
             
-            // Filtro por status
-            if (filters.selectedStatus !== "all" && exam.status !== filters.selectedStatus) {
-              return false;
-            }
-            
-            // Filtro por computador
-            if (filters.computerFilter !== "all") {
-              const computerNumber = parseInt(filters.computerFilter.replace('PC-', ''));
-              if (!isNaN(computerNumber) && exam.computer_number !== computerNumber) {
-                return false;
-              }
-            }
-            
-            // Filtro por data
-            if (filters.date) {
-              const examDate = new Date(exam.exam_date);
-              const filterDate = new Date(filters.date);
-              
-              // Comparar apenas ano, mês e dia
-              if (
-                examDate.getFullYear() !== filterDate.getFullYear() ||
-                examDate.getMonth() !== filterDate.getMonth() ||
-                examDate.getDate() !== filterDate.getDate()
-              ) {
-                return false;
-              }
-            }
-            
             return true;
           });
         }
 
-        console.log("Filtered admin exams data:", data);
-        return data;
+        console.log("Filtered admin exams data:", filteredData);
+        return filteredData;
       } catch (error: any) {
         console.error("Error fetching admin exams:", error);
         toast({
@@ -108,6 +94,7 @@ const AdminAgendamentos = () => {
         throw error;
       }
     },
+    refetchInterval: 60000, // Refetch every minute
   });
 
   const handleApplyFilters = (newFilters: typeof filters) => {

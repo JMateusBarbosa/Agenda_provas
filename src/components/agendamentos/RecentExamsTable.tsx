@@ -3,7 +3,12 @@ import { useQuery } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
+import { ExamRecord } from "@/types/prova";
 
+/**
+ * Componente que exibe uma tabela com os agendamentos de prova mais recentes
+ * Busca dados do Supabase e os exibe de forma organizada
+ */
 const RecentExamsTable = () => {
   const { toast } = useToast();
 
@@ -14,27 +19,39 @@ const RecentExamsTable = () => {
       if (!supabase) throw new Error("Cliente Supabase não inicializado");
       
       console.log("Fetching recent exams");
-      const { data, error } = await supabase
-        .from('exams')
-        .select(`*`)
-        .order('created_at', { ascending: false })
-        .limit(5);
+      try {
+        const { data, error } = await supabase
+          .from('exams')
+          .select(`*`)
+          .order('created_at', { ascending: false })
+          .limit(5);
 
-      if (error) {
-        console.error("Error fetching recent exams:", error);
-        toast({
-          variant: "destructive",
-          title: "Erro ao carregar agendamentos recentes",
-          description: error.message,
-        });
+        if (error) {
+          console.error("Error fetching recent exams:", error);
+          toast({
+            variant: "destructive",
+            title: "Erro ao carregar agendamentos recentes",
+            description: error.message,
+          });
+          throw error;
+        }
+        
+        console.log("Recent exams fetched:", data);
+        return data as ExamRecord[];
+      } catch (error: any) {
+        console.error("Error in fetchRecentExams:", error);
         throw error;
       }
-      
-      console.log("Recent exams fetched:", data);
-      return data;
     },
     refetchInterval: 30000, // Refetch every 30 seconds
   });
+
+  /**
+   * Traduz o turno para português
+   */
+  const translateShift = (shift: string): string => {
+    return shift === 'morning' ? 'Manhã' : 'Tarde';
+  };
 
   return (
     <div className="mt-12">
@@ -70,7 +87,7 @@ const RecentExamsTable = () => {
                   <td className="p-3">{exam.exam_type}</td>
                   <td className="p-3">{format(new Date(exam.exam_date), "dd/MM/yyyy")}</td>
                   <td className="p-3">PC-{String(exam.computer_number).padStart(2, '0')}</td>
-                  <td className="p-3">{exam.shift === 'morning' ? 'Manhã' : 'Tarde'}</td>
+                  <td className="p-3">{translateShift(exam.shift)}</td>
                   <td className="p-3">{exam.class_time}</td>
                 </tr>
               ))
