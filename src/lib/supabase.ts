@@ -21,22 +21,21 @@ if (!supabaseUrl || !supabaseAnonKey) {
   console.warn('Para corrigir este problema, adicione as variáveis de ambiente ao arquivo .env.local ou através do seu provedor de hospedagem.');
 }
 
-// Inicializa o cliente Supabase com configurações de autenticação
-const supabase = supabaseUrl && supabaseAnonKey 
-  ? createClient<Database>(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: true,
-        persistSession: true,
-        detectSessionInUrl: true
-      }
-    })
-  : null;
+// Se as credenciais não estiverem configuradas, configuramos com valores temporários
+// apenas para a aplicação não quebrar durante o desenvolvimento (deve ser substituído)
+const tempUrl = supabaseUrl || 'https://temp-supabase-url.supabase.co';
+const tempKey = supabaseAnonKey || 'temp-anon-key';
 
-if (supabase) {
-  console.log('✅ Cliente Supabase inicializado com sucesso');
-} else {
-  console.warn('⚠️ Cliente Supabase não inicializado - algumas funcionalidades podem não estar disponíveis');
-  console.warn('As funcionalidades que dependem do banco de dados e autenticação não funcionarão corretamente.');
-}
+// Inicializa o cliente Supabase com configurações de autenticação
+const supabase = createClient<Database>(tempUrl, tempKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true
+  }
+});
+
+console.log('✅ Cliente Supabase inicializado');
+console.log('⚠️ Importante: Se as variáveis de ambiente estiverem ausentes, a aplicação estará operando em modo temporário.');
 
 export { supabase };

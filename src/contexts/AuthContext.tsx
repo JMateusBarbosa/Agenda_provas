@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase';
@@ -58,16 +59,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const { data: { session } } = await supabase.auth.getSession();
-        console.log('Sessão atual:', session ? 'Ativa' : 'Inativa');
-        setSession(session);
+        const { data } = await supabase.auth.getSession();
+        console.log('Sessão atual:', data.session ? 'Ativa' : 'Inativa');
         
-        if (session?.user) {
-          setUser(session.user);
-          const adminStatus = await checkAdminStatus(session.user.id);
+        if (data.session) {
+          setSession(data.session);
+          setUser(data.session.user);
+          const adminStatus = await checkAdminStatus(data.session.user.id);
           setIsAdmin(adminStatus);
           console.log('Usuário é administrador:', adminStatus);
         } else {
+          setSession(null);
           setUser(null);
           setIsAdmin(false);
         }
@@ -82,17 +84,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      console.log('Mudança de estado de autenticação:', _event);
-      setSession(session);
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
+      console.log('Mudança de estado de autenticação:', event);
       
-      if (session?.user) {
+      if (session) {
+        setSession(session);
         setUser(session.user);
         const adminStatus = await checkAdminStatus(session.user.id);
         setIsAdmin(adminStatus);
+        console.log('Usuário autenticado com sucesso. Admin:', adminStatus);
       } else {
+        setSession(null);
         setUser(null);
         setIsAdmin(false);
+        console.log('Usuário desconectado');
       }
     });
 
@@ -105,12 +110,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw new Error('Sistema não inicializado corretamente');
       }
 
-      const { error, data } = await supabase.auth.signInWithPassword({
+      console.log('Iniciando login com:', email);
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
+        console.error('Erro retornado pelo Supabase:', error);
         // Verificação específica para o erro de recursão
         if (error.message && error.message.includes('infinite recursion')) {
           console.warn('Detectado erro de recursão na política RLS. Continuando mesmo assim...');
@@ -129,10 +136,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         throw error;
       }
       
+      console.log('Resposta do login:', data);
+      
       // Verificar se o usuário logado é administrador
       if (data.user) {
+        console.log('Usuário autenticado:', data.user.email);
         const adminStatus = await checkAdminStatus(data.user.id);
         setIsAdmin(adminStatus);
+        console.log('Status de admin:', adminStatus);
       }
 
       toast({
