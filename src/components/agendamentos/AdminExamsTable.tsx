@@ -10,6 +10,7 @@ interface Exam {
   computer_number: number;
   class_time: string;
   recovery_date?: string;
+  module?: string; // Add optional module field
 }
 
 interface AdminExamsTableProps {
@@ -46,6 +47,7 @@ const AdminExamsTable = ({ exams, isLoading }: AdminExamsTableProps) => {
         <thead>
           <tr className="bg-muted">
             <th className="p-3 text-left font-semibold">Aluno</th>
+            <th className="p-3 text-left font-semibold">Módulo</th>
             <th className="p-3 text-left font-semibold">Tipo</th>
             <th className="p-3 text-left font-semibold">Data</th>
             <th className="p-3 text-left font-semibold">Computador</th>
@@ -57,7 +59,7 @@ const AdminExamsTable = ({ exams, isLoading }: AdminExamsTableProps) => {
         <tbody>
           {isLoading ? (
             <tr>
-              <td colSpan={7} className="text-center py-4">
+              <td colSpan={8} className="text-center py-4">
                 Carregando agendamentos...
               </td>
             </tr>
@@ -68,6 +70,7 @@ const AdminExamsTable = ({ exams, isLoading }: AdminExamsTableProps) => {
                 className="border-b border-border hover:bg-muted/50 transition-colors"
               >
                 <td className="p-3">{exam.student_name}</td>
+                <td className="p-3">{exam.module || "Módulo"}</td>
                 <td className="p-3">{exam.exam_type}</td>
                 <td className="p-3">
                   {format(new Date(exam.exam_date), "dd/MM/yyyy")}
@@ -86,7 +89,7 @@ const AdminExamsTable = ({ exams, isLoading }: AdminExamsTableProps) => {
             ))
           ) : (
             <tr>
-              <td colSpan={7} className="text-center py-8 text-muted-foreground">
+              <td colSpan={8} className="text-center py-8 text-muted-foreground">
                 Nenhum agendamento encontrado com os filtros selecionados.
               </td>
             </tr>

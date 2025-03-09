@@ -53,4 +53,5 @@ export interface ExamRecord {
   created_by: string;
   created_at?: string;
   updated_at?: string;
+  module?: string;          // Campo opcional para o módulo
 }

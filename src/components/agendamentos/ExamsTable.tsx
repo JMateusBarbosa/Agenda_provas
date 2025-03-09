@@ -17,6 +17,7 @@ interface Exam {
   status: string;
   computer_number: number;
   class_time: string;
+  module?: string; // Add optional module field
 }
 
 interface ExamsTableProps {
@@ -53,6 +54,7 @@ const ExamsTable = ({ exams, isLoading }: ExamsTableProps) => {
         <TableHeader>
           <TableRow className="bg-primary hover:bg-primary/90">
             <TableHead className="text-white font-semibold">Aluno</TableHead>
+            <TableHead className="text-white font-semibold">Módulo</TableHead>
             <TableHead className="text-white font-semibold">Data</TableHead>
             <TableHead className="text-white font-semibold">Horário</TableHead>
             <TableHead className="text-white font-semibold">Tipo</TableHead>
@@ -63,7 +65,7 @@ const ExamsTable = ({ exams, isLoading }: ExamsTableProps) => {
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-4">
+              <TableCell colSpan={7} className="text-center py-4">
                 Carregando agendamentos...
               </TableCell>
             </TableRow>
@@ -74,6 +76,7 @@ const ExamsTable = ({ exams, isLoading }: ExamsTableProps) => {
                 className="hover:bg-primary/5 transition-colors"
               >
                 <TableCell>{exam.student_name}</TableCell>
+                <TableCell>{exam.module || "Módulo"}</TableCell>
                 <TableCell>
                   {format(new Date(exam.exam_date), "dd/MM/yyyy")}
                 </TableCell>
@@ -87,7 +90,7 @@ const ExamsTable = ({ exams, isLoading }: ExamsTableProps) => {
             ))
           ) : (
             <TableRow>
-              <TableCell colSpan={6} className="text-center py-4 text-muted-foreground">
+              <TableCell colSpan={7} className="text-center py-4 text-muted-foreground">
                 Nenhum agendamento encontrado com os filtros selecionados.
               </TableCell>
             </TableRow>

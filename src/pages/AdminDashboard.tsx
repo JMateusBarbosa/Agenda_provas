@@ -3,13 +3,26 @@ import { Navigate, useLocation, Outlet } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
 
 const AdminDashboard = () => {
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, session, isAdmin } = useAuth();
+  const [isAuthenticated, setIsAuthenticated] = useState<boolean | null>(null);
+  
+  useEffect(() => {
+    // Consideramos o usuário autenticado se temos um usuário/sessão 
+    // ou se foi detectado como admin (mesmo com erro de RLS)
+    setIsAuthenticated(!!user || !!session || isAdmin);
+  }, [user, session, isAdmin]);
+
+  // Aguardar a verificação de autenticação
+  if (isAuthenticated === null) {
+    return <div className="flex justify-center items-center h-screen">Carregando...</div>;
+  }
   
   // Redirecionar para login se não estiver autenticado
-  if (!user) {
+  if (!isAuthenticated) {
     return <Navigate to="/admin" replace />;
   }
   

@@ -63,6 +63,7 @@ const RecentExamsTable = () => {
           <thead>
             <tr className="bg-gray-100">
               <th className="p-3 text-left">Aluno</th>
+              <th className="p-3 text-left">Módulo</th>
               <th className="p-3 text-left">Tipo</th>
               <th className="p-3 text-left">Data</th>
               <th className="p-3 text-left">Computador</th>
@@ -73,7 +74,7 @@ const RecentExamsTable = () => {
           <tbody>
             {loadingExams ? (
               <tr>
-                <td colSpan={6} className="text-center py-4">
+                <td colSpan={7} className="text-center py-4">
                   Carregando agendamentos recentes...
                 </td>
               </tr>
@@ -84,6 +85,7 @@ const RecentExamsTable = () => {
                   className="border-b border-gray-200 hover:bg-gray-50"
                 >
                   <td className="p-3">{exam.student_name}</td>
+                  <td className="p-3">{exam.module || "Módulo"}</td>
                   <td className="p-3">{exam.exam_type}</td>
                   <td className="p-3">{format(new Date(exam.exam_date), "dd/MM/yyyy")}</td>
                   <td className="p-3">PC-{String(exam.computer_number).padStart(2, '0')}</td>
@@ -93,7 +95,7 @@ const RecentExamsTable = () => {
               ))
             ) : (
               <tr>
-                <td colSpan={6} className="text-center py-4 text-gray-500">
+                <td colSpan={7} className="text-center py-4 text-gray-500">
                   Nenhum agendamento recente encontrado.
                 </td>
               </tr>
